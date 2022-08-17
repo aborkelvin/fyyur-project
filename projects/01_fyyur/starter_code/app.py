@@ -74,7 +74,7 @@ def venues():
       venueunit.append({
         "id":venue.id,
         "name": venue.name,
-        "num_upcoming_shows": len(list(filter(lambda x: x.start_time > datetime.now(), Shows.query.filter_by(venue_id=venue.id)))),
+        "num_upcoming_shows": len(db.session.query(Shows).join(Venue).filter(Shows.venue_id==venue.id).filter(Shows.start_time > datetime.now()).all()),
       })
     locationvenues['venues'] = venueunit
     data.append(locationvenues)
@@ -96,7 +96,8 @@ def search_venues():
   }
   data = []
   for venue in resultingvenues:
-    upcoming_shows = list(filter(lambda x: x.start_time > datetime.now(), Shows.query.filter_by(venue_id=venue.id)))  
+    #upcoming_shows = list(filter(lambda x: x.start_time > datetime.now(), Shows.query.filter_by(venue_id=venue.id)))
+    upcoming_shows = db.session.query(Shows).join(Venue).filter(Shows.venue_id==venue.id).filter(Shows.start_time > datetime.now()).all()  
     num_upcoming_shows = len(upcoming_shows)
     venuedetails = {
       'id':venue.id,
@@ -114,8 +115,9 @@ def search_venues():
 @app.route('/venues/<int:venue_id>')
 def show_venue(venue_id):  
   venue = Venue.query.get(venue_id)
-  
-  past_shows = list(filter(lambda x: x.start_time < datetime.now(), Shows.query.filter_by(venue_id=venue.id)))
+  #past_shows = list(filter(lambda x: x.start_time < datetime.now(), Shows.query.filter_by(venue_id=venue.id)))
+  past_shows = db.session.query(Shows).join(Venue).filter(Shows.venue_id==venue_id).filter(Shows.start_time < datetime.now()).all()
+
   past_shows_count = len(past_shows)  
   pastshow_store = []
   for past_show in past_shows:
@@ -127,7 +129,7 @@ def show_venue(venue_id):
     }
     pastshow_store.append(pastshowdets)
 
-  upcoming_shows = list(filter(lambda x: x.start_time > datetime.now(), Shows.query.filter_by(venue_id=venue.id)))  
+  upcoming_shows = db.session.query(Shows).join(Venue).filter(Shows.venue_id==venue_id).filter(Shows.start_time > datetime.now()).all()
   upcoming_shows_count = len(upcoming_shows)
   upcomingshow_store = []
   for upcoming_show in upcoming_shows:
@@ -198,10 +200,22 @@ def create_venue_submission():
     db.session.close()
   return render_template('pages/home.html')
 
-@app.route('/venues/<venue_id>', methods=['DELETE'])
+@app.route('/venues/<int:venue_id>/delete', methods=['GET'])
 def delete_venue(venue_id):
   # TODO: Complete this endpoint for taking a venue_id, and using
   # SQLAlchemy ORM to delete a record. Handle cases where the session commit could fail.
+  venue = Venue.query.get(venue_id)  
+  try:
+    db.session.delete(venue)
+    db.session.commit()
+    flash(venue.name + 'deleted successfully')
+  except:    
+    db.session.rollback()
+    print(sys.exc_info())
+    flash('An error occurred.' +venue.name + ' could not be deleted.')
+  finally:
+    db.session.close()
+  return render_template('pages/home.html')
 
   # BONUS CHALLENGE: Implement a button to delete a Venue on a Venue Page, have it so that
   # clicking that button delete it from the db then redirect the user to the homepage
@@ -243,7 +257,7 @@ def search_artists():
   }
   data = []
   for artist in resultingartists:
-    upcoming_shows = list(filter(lambda x: x.start_time > datetime.now(), Shows.query.filter_by(artist_id=artist.id)))  
+    upcoming_shows = db.session.query(Shows).join(Artist).filter(Shows.artist_id==artist.id).filter(Shows.start_time > datetime.now()).all()
     num_upcoming_shows = len(upcoming_shows)
     artistdetails = {
       'id':artist.id,
@@ -262,7 +276,7 @@ def search_artists():
 def show_artist(artist_id):
   artist = Artist.query.get(artist_id)
 
-  past_shows = list(filter(lambda x: x.start_time < datetime.now(), Shows.query.filter_by(artist_id=artist.id)))
+  past_shows = db.session.query(Shows).join(Artist).filter(Shows.artist_id==artist_id).filter(Shows.start_time < datetime.now()).all()
   past_shows_count = len(past_shows)  
   pastshow_store = []
   for past_show in past_shows:
@@ -274,7 +288,7 @@ def show_artist(artist_id):
     }
     pastshow_store.append(pastshowdets)
 
-  upcoming_shows = list(filter(lambda x: x.start_time > datetime.now(), Shows.query.filter_by(artist_id=artist.id)))
+  upcoming_shows = db.session.query(Shows).join(Artist).filter(Shows.artist_id==artist_id).filter(Shows.start_time > datetime.now()).all()
   upcoming_shows_count = len(upcoming_shows)  
   upcomingshow_store = []
   for upcoming_show in upcoming_shows:
@@ -405,21 +419,21 @@ def edit_artist_submission(artist_id):
 @app.route('/venues/<int:venue_id>/edit', methods=['GET'])
 def edit_venue(venue_id):
   form = VenueForm()
+  ven = Venue.query.get(venue_id)
   venue={
-    "id": 1,
-    "name": "The Musical Hop",
-    "genres": ["Jazz", "Reggae", "Swing", "Classical", "Folk"],
-    "address": "1015 Folsom Street",
-    "city": "San Francisco",
-    "state": "CA",
-    "phone": "123-123-1234",
-    "website": "https://www.themusicalhop.com",
-    "facebook_link": "https://www.facebook.com/TheMusicalHop",
-    "seeking_talent": True,
-    "seeking_description": "We are on the lookout for a local artist to play every two weeks. Please call us.",
-    "image_link": "https://images.unsplash.com/photo-1543900694-133f37abaaa5?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=400&q=60"
+    "id": ven.id,
+    "name": ven.name,
+    "genres": ven.genres,
+    "address": ven.address,
+    "city": ven.city,
+    "state": ven.state,
+    "phone": ven.phone,
+    "website": ven.website,
+    "facebook_link": ven.facebook_link,
+    "seeking_talent": ven.seeking_talent,
+    "seeking_description": ven.seeking_description,
+    "image_link": ven.image_link,
   }
-  venue = Venue.query.get(venue_id)
   return render_template('forms/edit_venue.html', form=form, venue=venue)
 
 @app.route('/venues/<int:venue_id>/edit', methods=['POST'])
